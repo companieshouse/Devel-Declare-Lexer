@@ -15,21 +15,62 @@ sub new
     return $self;
 }
 
+my %named_lexed_stack = ();
+
+sub lexed
+{
+    my ($key, $callback) = @_;
+    say "Setup callback for $key";
+    $named_lexed_stack{$key} = $callback;
+}
+sub call_lexed
+{
+    my ($name, $stream) = @_;
+
+    say "Looking for callback $name";
+
+    my $callback = $named_lexed_stack{$name};
+    if($callback) {
+        say "Found callback $callback";
+        $stream = &$callback($stream);
+    }
+
+    return $stream;
+}
+
 sub import
 {
-    my ($class) = @_;
+    my $class = shift;
     my $caller = caller;
 
-    Devel::Declare->setup_for(
-        $caller,
-        {
-            "lexer_test" => { const => \&lexer },
-        }
-    );
-
-    # Setup a sub in the callers package which returns 1
     no strict 'refs';
-    *{$caller.'::lexer_test'} = sub () { 1; };
+    my @consts;
+
+    my %tags = map { $_ => 1 } @_;
+    if($tags{":lexer_test"}) {
+        say "Setting up lexer_test";
+
+        push @consts, "lexer_test";
+    }
+
+    my @names = @_;
+    for my $name (@names) {
+        next if $name =~ /:/;
+        say "Setting up $name";
+
+        push @consts, $name;
+    }
+
+    for my $word (@consts) {
+        say "Injecting '$word'";
+        Devel::Declare->setup_for(
+            $caller,
+            {
+                $word => { const => \&lexer }
+            }
+        );
+        *{$caller.'::'.$word} = sub () { 1; };
+    }
 }
 
 sub token
@@ -223,6 +264,8 @@ sub lexer
     }
 
     my $stmt = "";
+    # Callback (AT COMPILE TIME) to allow manipulation of the token stream before injection
+    @tokens = @{call_lexed($symbol, \@tokens)};
     for my $token (@tokens) {
         $stmt .= $token->get;
     }
@@ -266,17 +309,18 @@ say "\nLine $l, sol[$sol], eol[$eol], diff[$diff], linestr[$linestr], substr[$su
     say "Got substr[$substr] sol[$sol] eol[$eol] diff[$diff]";
 
     my $newline = "\n" x $lineadjust;
-    if($symbol =~ /lexer_test/) {
+say "Symbol[$symbol]";
+    if($symbol =~ /^lexer_test$/) {
         #Devel::Declare::set_linestr("$symbol and \$parsed = \"$stmt\";");
         #return;
-        $newline .= "and \$parsed = \"$stmt\";";
+        $newline .= "and \$lexed = \"$stmt\";";
     } else {
         #Devel::Declare::set_linestr("$symbol and print \"Extracted statement [$stmt]\n\";");
-        $newline .= "and print \"Extracted statement [$stmt]\n\";";
+        $newline .= " and " . $stmt;
     }
 
     #substr($linestr, $sol, $diff) = $newline; # put the rest of the statement in
-    substr($linestr, $sol) = $newline; # put the rest of the statement in
+    substr($linestr, $sol, (length $linestr) - $sol - 1) = $newline; # put the rest of the statement in
 
     say "Got new linestr[$linestr] from original_linestr[$original_linestr]";
 
