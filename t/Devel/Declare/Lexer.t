@@ -4,32 +4,56 @@ package Devel::Declare::Lexer::t;
 
 use strict;
 use warnings;
-use Devel::Declare::Lexer qw/ :lexer_test /; # creates a lexer_test keyword and places lexed code into runtime $lexed
-#use Devel::Declare::Lexer qw/ :lexer_test lexer_test2 /; # creates a lexer_test keyword and places lexed code into runtime $lexed
+#use Devel::Declare::Lexer qw/ :lexer_test /; # creates a lexer_test keyword and places lexed code into runtime $lexed
+use Devel::Declare::Lexer qw/ :lexer_test lexer_test2 /; # creates a lexer_test keyword and places lexed code into runtime $lexed
+
+use Devel::Declare::Lexer::Token;
+use Devel::Declare::Lexer::Token::Comma;
+use Devel::Declare::Lexer::Token::Declarator;
+use Devel::Declare::Lexer::Token::EndOfStatement;
+use Devel::Declare::Lexer::Token::LeftBracket;
+use Devel::Declare::Lexer::Token::Newline;
+use Devel::Declare::Lexer::Token::Operator;
+use Devel::Declare::Lexer::Token::RightBracket;
+use Devel::Declare::Lexer::Token::String;
+use Devel::Declare::Lexer::Token::Variable;
+use Devel::Declare::Lexer::Token::Whitespace;
 
 use Test::More;
 
 my $tests = 0;
 my $lexed;
 
-#BEGIN {
-#    Devel::Declare::Lexer::lexed(lexer_test2 => sub {
-#        my $stream = shift;
-#
-#        my @ns = ();
-#        tie @ns, "Devel::Declare::Lexer::Stream";
-#
-#        push @ns, new Devel::Declare::Lexer::Token( type => 'word', length => '5', value => 'print' );
-#        push @ns, new Devel::Declare::Lexer::Token( type => 'whitespace', length => '1', value => ' ' );
-#        push @ns, new Devel::Declare::Lexer::Token( type => 'string', length => '22', value => 'Hello pigs in blankets', strstype => "\"", stretype => "\"" );
-#        push @ns, new Devel::Declare::Lexer::Token( type => 'eos', length => '1', value => ';' );
-#        push @ns, new Devel::Declare::Lexer::Token( type => 'eol', length => '1', value => "\n" );
-#
-#        return \@ns;
-#    });
-#}
-#
-#lexer_test2 "pigs in blankets";
+BEGIN {
+    Devel::Declare::Lexer::lexed(lexer_test2 => sub {
+        my ($stream_r) = @_;
+        my @stream = @$stream_r;
+
+        my $string = $stream[2]; # keyword [whitespace] "string"
+        $string->{value} =~ tr/pi/do/;
+
+        my @ns = ();
+        tie @ns, "Devel::Declare::Lexer::Stream";
+
+        push @ns, (
+            new Devel::Declare::Lexer::Token::Declarator( value => 'lexer_test2' ),
+            new Devel::Declare::Lexer::Token::Whitespace( value => ' ' ),
+            new Devel::Declare::Lexer::Token( value => 'my' ),
+            new Devel::Declare::Lexer::Token::Variable( value => '$lexer_test2'),
+            new Devel::Declare::Lexer::Token::Whitespace( value => ' ' ),
+            new Devel::Declare::Lexer::Token::Operator( value => '=' ),
+            new Devel::Declare::Lexer::Token::Whitespace( value => ' ' ),
+            $string,
+            new Devel::Declare::Lexer::Token::EndOfStatement,
+            new Devel::Declare::Lexer::Token::Newline,
+        );
+
+        return \@ns;
+    });
+}
+
+lexer_test2 "pigs in blankets";
+++$tests && is($lexer_test2, q|dogs on blankets|, 'Lexer callback');
 
 lexer_test "this is a test";
 ++$tests && is($lexed, q|lexer_test "this is a test";|, 'Strings');
@@ -80,7 +104,7 @@ lexer_test ( {
     def => 4,
 } );|, 'Hashref multiline');
 
-++$tests && is(__LINE__, 83, 'Line numbering (CHECK WHICH LINE THIS IS ON)');
+++$tests && is(__LINE__, 107, 'Line numbering (CHECK WHICH LINE THIS IS ON)');
 
 done_testing $tests;
 

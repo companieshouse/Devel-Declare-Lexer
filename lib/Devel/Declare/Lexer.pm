@@ -1,42 +1,29 @@
 package Devel::Declare::Lexer;
 
 use strict;
+use warnings;
+use v5.14.2;
+
+our $VERSION = '0.001';
+
+use Data::Dumper;
 use Devel::Declare;
 use Devel::Declare::Lexer::Stream;
 use Devel::Declare::Lexer::Token;
+use Devel::Declare::Lexer::Token::Comma;
+use Devel::Declare::Lexer::Token::Declarator;
+use Devel::Declare::Lexer::Token::EndOfStatement;
+use Devel::Declare::Lexer::Token::LeftBracket;
+use Devel::Declare::Lexer::Token::Newline;
+use Devel::Declare::Lexer::Token::Operator;
+use Devel::Declare::Lexer::Token::RightBracket;
+use Devel::Declare::Lexer::Token::String;
+use Devel::Declare::Lexer::Token::Variable;
+use Devel::Declare::Lexer::Token::Whitespace;
 
-use v5.14.2;
-
-sub new
-{
-    my ($caller, %arg) = @_;
-
-    my $self = bless { %arg }, $caller;
-    return $self;
-}
-
-my %named_lexed_stack = ();
-
-sub lexed
-{
-    my ($key, $callback) = @_;
-    say "Setup callback for $key";
-    $named_lexed_stack{$key} = $callback;
-}
-sub call_lexed
-{
-    my ($name, $stream) = @_;
-
-    say "Looking for callback $name";
-
-    my $callback = $named_lexed_stack{$name};
-    if($callback) {
-        say "Found callback $callback";
-        $stream = &$callback($stream);
-    }
-
-    return $stream;
-}
+use vars qw/ @ISA $DEBUG /;
+@ISA = ();
+$DEBUG = 0;
 
 sub import
 {
@@ -47,8 +34,11 @@ sub import
     my @consts;
 
     my %tags = map { $_ => 1 } @_;
+    if($tags{":debug"}) {
+        $DEBUG = 1;
+    }
     if($tags{":lexer_test"}) {
-        say "Setting up lexer_test";
+        $DEBUG and say "Adding 'lexer_test' to keyword list";
 
         push @consts, "lexer_test";
     }
@@ -56,13 +46,13 @@ sub import
     my @names = @_;
     for my $name (@names) {
         next if $name =~ /:/;
-        say "Setting up $name";
+        $DEBUG and say "Adding '$name' to keyword list";
 
         push @consts, $name;
     }
 
     for my $word (@consts) {
-        say "Injecting '$word'";
+        $DEBUG and say "Injecting '$word' into '$caller'";
         Devel::Declare->setup_for(
             $caller,
             {
@@ -73,31 +63,41 @@ sub import
     }
 }
 
-sub token
+my %named_lexed_stack = ();
+sub lexed
 {
-    my ($type, $length, $value, %arg) = @_;
-    return new Devel::Declare::Lexer::Token(
-        type => $type,
-        length => $length,
-        value => $value,
-        %arg
-    );
+    my ($key, $callback) = @_;
+    $DEBUG and say "Registered callback for keyword '$key'";
+    $named_lexed_stack{$key} = $callback;
+}
+
+sub call_lexed
+{
+    my ($name, $stream) = @_;
+
+    $DEBUG and say "Checking for callbacks for keyword '$name'";
+    $DEBUG and say Dumper $stream;
+
+    my $callback = $named_lexed_stack{$name};
+    if($callback) {
+        $DEBUG and say "Found callback '$callback' for keyword '$name'";
+        $stream = &$callback($stream);
+    }
+
+    $DEBUG and say Dumper $stream;
+
+    return $stream;
 }
 
 sub lexer
 {
     my ($symbol, $offset) = @_;
 
-    print "=" x 80, "\n";
+    $DEBUG and print "=" x 80, "\n";
 
     my $linestr = Devel::Declare::get_linestr;
     my $original_linestr = $linestr;
-    say "Got linestr '$linestr'";
-    print "            '";
-    my $c = length $linestr;
-    my $c1 = 0;
-    while($c) { print $c1; $c1++; $c1 = 0 if $c1 > 9; $c--; }
-    print "\n";
+    $DEBUG and say "Starting with linestr '$linestr'";
 
     my @tokens = ();
     tie @tokens, "Devel::Declare::Lexer::Stream";
@@ -108,44 +108,40 @@ sub lexer
 
     # Skip the declarator
     $offset += Devel::Declare::toke_move_past_token($offset);
-    push @tokens, token('declarator', length $symbol, $symbol);
+    push @tokens, new Devel::Declare::Lexer::Token::Declarator( value => $symbol );
+    $DEBUG and say "Skipped declarator '$symbol'";
 
     my $skipspace = sub {
-        #my $no_eol = shift;
         $len = Devel::Declare::toke_skipspace($offset);
         if($len > 0) {
             $tok = substr($linestr, $offset, $len);
-            say "Skipped whitespace '$tok', length [$len]";
-            push @tokens, token('whitespace', $len, $tok);
+            $DEBUG and say "Skipped whitespace '$tok', length [$len]";
+            push @tokens, new Devel::Declare::Lexer::Token::Whitespace( value => $tok );
             $offset += $len;
         } elsif ($len < 0) {
-            say "Got end of line X";
-            #push @tokens, token('whitespace', $len, "\n") if (defined $no_eol && !$no_eol);
-            #$offset += $len;
+            $DEBUG and say "Got end of line in skipspace";
         } elsif ($len == 0) {
-            say "No whitespace";
+            $DEBUG and say "No whitespace skipped";
         }
         return $len;
     };
 
     # get the message
-    say "Length[", length $linestr, "]";
-#my $abort = 0;
+    $DEBUG and say "Linestr length [", length $linestr, "]";
     while($offset < length $linestr) {
-#$abort++; last if $abort > 25;
-        say "Offset[$offset], Remaining[", substr($linestr, $offset), "]";
+        $DEBUG and say "Offset[$offset], Remaining[", substr($linestr, $offset), "]";
 
         if(substr($linestr, $offset, 1) eq ';') {
-            say "Got end of statement";
-            push @tokens, token('eos', 1, ';');
+            $DEBUG and say "Got end of statement";
+            push @tokens, new Devel::Declare::Lexer::Token::EndOfStatement;
             $offset += 1;
             $eoleos = 1;
             next;
         }
 
         if(substr($linestr, $offset, 2) eq "\n") {
-            say "Got end of line L (current line $line)";
-            push @tokens, token('eol', 1, "\n");
+            $DEBUG and say "Got end of line in loop (current line $line)";
+            push @tokens, new Devel::Declare::Lexer::Token::Newline;
             $offset += 1;
 
             last if $eoleos;
@@ -153,11 +149,14 @@ sub lexer
 
             # we're actually consuming a new line now
 
+            # We don't use skipspace here - it does too much!
             #&$skipspace;
             $len = Devel::Declare::toke_skipspace($offset);
             if($len != 0) {
-                #$offset += $len - 6; #???#
-                say "Got len in EOL L = $len";
+                # TODO it seems odd that we don't add $len to the
+                # offset... this might come back to bite us later!
+                #$offset += $len - 6;
+                $DEBUG and say "Skipped $len whitespace following EOL, not added to \$offset";
             }
 
             Devel::Declare::clear_lex_stuff;
@@ -171,7 +170,7 @@ sub lexer
             $line++;
             $lineoffsets{$line} = $offset;
 
-            say "Got linestr [$linestr]";
+            $DEBUG and say "Refreshed linestr [$linestr]";
             next;
         }
 
@@ -179,48 +178,48 @@ sub lexer
 
         if(substr($linestr, $offset, 1) =~ /(\{|\[|\()/) {
             my $b = substr($linestr, $offset, 1);
-            push @tokens, token('bracket', 1, $b);
-            say "Got bracket '$b'";
+            push @tokens, new Devel::Declare::Lexer::Token::LeftBracket( value => $b );
+            $DEBUG and say "Got left bracket '$b'";
             $offset += 1;
             next;
         }
         if(substr($linestr, $offset, 1) =~ /(\}|\]|\))/) {
             my $b = substr($linestr, $offset, 1);
-            push @tokens, token('bracket', 1, $b);
-            say "Got bracket '$b'";
+            push @tokens, new Devel::Declare::Lexer::Token::RightBracket( value => $b );
+            $DEBUG and say "Got right bracket '$b'";
             $offset += 1;
             next;
         }
 
         if(substr($linestr, $offset, 1) =~ /\\/) {
             $tok = substr($linestr, $offset, 1);
-            say "Got reference operator '$tok'";
-            push @tokens, token('operator', $len, $tok);
+            $DEBUG and say "Got reference operator '$tok'";
+            push @tokens, new Devel::Declare::Lexer::Token::Operator( value => $tok);
             $offset += 1;
             next;
         }
 
         if(substr($linestr, $offset, 1) =~ /(\$|\%|\@|\*)/) {
             # get the sign
-            #$len = Devel::Declare::toke_scan_word($offset, 1);
+            # TODO the variable name is captured later - it should probably be done here
             $tok = substr($linestr, $offset, 1);
-            say "Got variable '$tok'";
-            push @tokens, token('variable', 1, $tok);
+            $DEBUG and say "Got variable '$tok'";
+            push @tokens, new Devel::Declare::Lexer::Token::Variable( value => $tok );
             $offset += 1;
             next;
         }
 
         if(substr($linestr, $offset, 1) =~ /[!\+\-\*\/\.><=]/) {
             $tok = substr($linestr, $offset, 1);
-            say "Got operator '$tok'";
-            push @tokens, token('operator', $len, $tok);
+            $DEBUG and say "Got operator '$tok'";
+            push @tokens, new Devel::Declare::Lexer::Token::Operator( value => $tok );
             $offset += 1;
             next;
         }
 
         if(substr($linestr, $offset, 1) eq ',') {
-            say "Got a comma";
-            push @tokens, token('comma', 1, ',');
+            $DEBUG and say "Got a comma";
+            push @tokens, new Devel::Declare::Lexer::Token::Comma;
             $offset += 1;
             next;
         }
@@ -238,11 +237,11 @@ sub lexer
             } else {
                 $len = Devel::Declare::toke_scan_str($offset);
             }
-            say "Got string type $strstype, end type $stretype";
+            $DEBUG and say "Got string type '$strstype', end type '$stretype'";
             $tok = Devel::Declare::get_lex_stuff;
             Devel::Declare::clear_lex_stuff;
-            say "Got str '$tok'";
-            push @tokens, token('string', $len, $tok, strstype => $strstype, stretype => $stretype );
+            $DEBUG and say "Got string '$tok'";
+            push @tokens, new Devel::Declare::Lexer::Token::String( start => $strstype, end => $stretype, value => $tok );
             # get a new linestr - we might have captured multiple lines
             $linestr = Devel::Declare::get_linestr;
             $offset += $len;
@@ -255,40 +254,47 @@ sub lexer
         $len = Devel::Declare::toke_scan_word($offset, 1);
         if($len) {
             $tok = substr($linestr, $offset, $len);
-            say "Got token '$tok'";
-            push @tokens, token('word', $len, $tok);
+            $DEBUG and say "Got token '$tok'";
+            push @tokens, new Devel::Declare::Lexer::Token( value => $tok );
             $offset += $len;
             next;
         }
 
     }
 
-    my $stmt = "";
     # Callback (AT COMPILE TIME) to allow manipulation of the token stream before injection
+    $DEBUG and say Dumper \@tokens;
     @tokens = @{call_lexed($symbol, \@tokens)};
+
+    my $stmt = "";
     for my $token (@tokens) {
         $stmt .= $token->get;
     }
 
-    print "=" x 80, "\n";
+    $DEBUG and print "=" x 80, "\n";
 
-    $stmt =~ s/\\/\\\\/g;
-    $stmt =~ s/\"/\\"/g;
-    $stmt =~ s/\$/\\\$/g;
-    $stmt =~ s/\n/\\n/g;
-    chomp $stmt;
-    $stmt = substr($stmt, 0, (length $stmt) - 2); # strip the final \\n
-    say "Statement: [$stmt]";
+    if($symbol =~ /^lexer_test$/) {
+        $DEBUG and say "Escaping statement for variable assignment";
+        $stmt =~ s/\\/\\\\/g;
+        $stmt =~ s/\"/\\"/g;
+        $stmt =~ s/\$/\\\$/g;
+        $stmt =~ s/\n/\\n/g;
+        chomp $stmt;
+        $stmt = substr($stmt, 0, (length $stmt) - 2); # strip the final \\n
+    } else {
+        chomp $stmt;
+    }
+    $DEBUG and say "Final statement: [$stmt]";
 
     my @lcnt = split /\\n/, $stmt;
     my $lc = scalar @lcnt;
     my $lineadjust = $lc - $line;
-    say "Linecount[$lc] lines[$line] - missing $lineadjust lines";
+    $DEBUG and say "Linecount[$lc] lines[$line] - missing $lineadjust lines";
 
     # we've got a new linestr, we need to re-fix all our offsets
-    say "\n\nStarted with linestr [$linestr]";
+    $DEBUG and say "\n\nStarted with linestr [$linestr]";
     use Data::Dumper;
-    print Dumper \%lineoffsets;
+    $DEBUG and say Dumper \%lineoffsets;
 
     for my $l (sort keys %lineoffsets) {
         my $sol = $lineoffsets{$l};
@@ -296,35 +302,125 @@ sub lexer
         my $eol = $lineoffsets{$l + 1} - 1;
         my $diff = $eol - $sol;
         my $substr = substr($linestr, $sol, $diff);
-say "\nLine $l, sol[$sol], eol[$eol], diff[$diff], linestr[$linestr], substr[$substr]";
+        $DEBUG and say "\nLine $l, sol[$sol], eol[$eol], diff[$diff], linestr[$linestr], substr[$substr]";
         substr($linestr, $sol, $diff) = " " x $diff;
     }
 
     # now clear up the last line
-    say "Still got linestr[$linestr]";
+    $DEBUG and say "Still got linestr[$linestr]";
     my $sol = $line == 1 ? (length $symbol) + 1 : $lineoffsets{$line};
     my $eol = (length $linestr) - 1;
     my $diff = $eol - $sol;
     my $substr = substr($linestr, $sol, $diff);
-    say "Got substr[$substr] sol[$sol] eol[$eol] diff[$diff]";
+    $DEBUG and say "Got substr[$substr] sol[$sol] eol[$eol] diff[$diff]";
 
     my $newline = "\n" x $lineadjust;
-say "Symbol[$symbol]";
     if($symbol =~ /^lexer_test$/) {
-        #Devel::Declare::set_linestr("$symbol and \$parsed = \"$stmt\";");
-        #return;
         $newline .= "and \$lexed = \"$stmt\";";
     } else {
-        #Devel::Declare::set_linestr("$symbol and print \"Extracted statement [$stmt]\n\";");
-        $newline .= " and " . $stmt;
+        $newline .= " and " . substr($stmt, length $symbol);
     }
 
-    #substr($linestr, $sol, $diff) = $newline; # put the rest of the statement in
     substr($linestr, $sol, (length $linestr) - $sol - 1) = $newline; # put the rest of the statement in
 
-    say "Got new linestr[$linestr] from original_linestr[$original_linestr]";
+    $DEBUG and say "Got new linestr[$linestr] from original_linestr[$original_linestr]";
 
+    $DEBUG and print "=" x 80, "\n";
     Devel::Declare::set_linestr($linestr);
 }
+
+=head1 NAME
+
+Devel::Declare::Lexer
+
+=head1 SYNOPSIS
+
+    # Add :debug tag to enable debugging
+    # Add :lexer_test to enable variable assignment
+    # Anything not starting with : becomes a keyword
+    use Devel::Declare::Lexer qw/ keyword /;
+
+    BEGIN {
+        # Create a callback for the keyword (inside a BEGIN block!)
+        Devel::Declare::Lexer::lexed(keyword => sub {
+            # Get the stream out (given as an arrayref)
+            my ($stream_r) = @_;
+            my @stream = @$stream_r;
+
+            my $str = $stream[2]; # in the example below, the string is the 3rd token
+
+            # Create a new stream (we could manipulate the existing one though)
+            my @ns = ();
+            tie @ns, "Devel::Declare::Lexer::Stream";
+
+            # Add a few tokens to print the string 
+            push @ns, (
+                # You need this (for now)
+                new Devel::Declare::Lexer::Token::Declarator( value => 'keyword' ),
+                new Devel::Declare::Lexer::Token::Whitespace( value => ' ' ),
+
+                # Everything else is your own custom code
+                new Devel::Declare::Lexer::Token( value => 'print' ),
+                new Devel::Declare::Lexer::Token::Whitespace( value => ' ' ),
+                $string,
+                new Devel::Declare::Lexer::Token::EndOfStatement,
+                new Devel::Declare::Lexer::Token::Newline,
+            );
+
+            # Stream now contains:
+            # keyword and print "This is a string";
+            # keyword evaluates to 1, everything after the and gets executed
+
+            # Return an arrayref
+            return \@ns;
+        });
+    }
+
+    # Use the keyword anywhere in this package
+    keyword "This is a string";
+
+=head1 DESCRIPTION
+
+L<Devel::Declare::Lexer> makes it easier to parse code using L<Devel::Declare>
+by generating a token stream from the statement and providing a callback for
+you to manipulate it before its parsed by Perl.
+
+The example in the synopsis creates a keyword named 'keyword', which accepts
+a string and prints it.
+
+Although this simple example could be done using print, say or any other simple
+subroutine, L<Devel::Declare::Lexer> supports much more flexible syntax.
+
+For example, it could be used to auto-expand subroutine declarations, e.g.
+    method MethodName ( $a, @b ) {
+        ... 
+    }
+into
+    sub MethodName ($@) {
+        my ($self, $a, @b) = @_;
+        ...
+    }
+
+Unlike L<Devel::Declare>, there's no need to worry about parsing text and
+taking care of multiline strings or code blocks - it's all done for you.
+
+=head1 SEE ALSO
+
+For more information about how L<Devel::Declare::Lexer>works , read the 
+documentation for L<Devel::Declare>.
+
+=head1 AUTHORS
+
+Ian Kent - E<lt>email@iankent.co.uk<gt> - original author
+
+http://www.iankent.co.uk/
+
+=head1 COPYRIGHT AND LICENSE
+
+This library is free software under the same terms as perl itself
+
+Copyright (c) 2013 Ian Kent
+
+=cut
 
 1;
