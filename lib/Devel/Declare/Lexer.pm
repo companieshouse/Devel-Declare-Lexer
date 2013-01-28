@@ -421,6 +421,9 @@ This library is free software under the same terms as perl itself
 
 Copyright (c) 2013 Ian Kent
 
+Devel::Declare::LexerParser is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the license for more details.
+
 =cut
 
 1;
