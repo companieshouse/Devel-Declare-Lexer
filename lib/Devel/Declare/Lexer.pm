@@ -30,10 +30,18 @@ sub import
     my $class = shift;
     my $caller = caller;
 
+    import_for($caller, @_);
+}
+
+sub import_for
+{
+    my ($caller, @args) = @_;
+    my $class = shift;
+
     no strict 'refs';
     my @consts;
 
-    my %tags = map { $_ => 1 } @_;
+    my %tags = map { $_ => 1 } @args;
     if($tags{":debug"}) {
         $DEBUG = 1;
     }
