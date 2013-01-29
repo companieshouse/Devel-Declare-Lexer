@@ -46,7 +46,7 @@ sub import_for
         $DEBUG = 1;
     }
     if($tags{":lexer_test"}) {
-        $DEBUG and say "Adding 'lexer_test' to keyword list";
+        $DEBUG and say STDERR "Adding 'lexer_test' to keyword list";
 
         push @consts, "lexer_test";
     }
@@ -54,13 +54,13 @@ sub import_for
     my @names = @_;
     for my $name (@names) {
         next if $name =~ /:/;
-        $DEBUG and say "Adding '$name' to keyword list";
+        $DEBUG and say STDERR "Adding '$name' to keyword list";
 
         push @consts, $name;
     }
 
     for my $word (@consts) {
-        $DEBUG and say "Injecting '$word' into '$caller'";
+        $DEBUG and say STDERR "Injecting '$word' into '$caller'";
         Devel::Declare->setup_for(
             $caller,
             {
@@ -75,7 +75,7 @@ my %named_lexed_stack = ();
 sub lexed
 {
     my ($key, $callback) = @_;
-    $DEBUG and say "Registered callback for keyword '$key'";
+    $DEBUG and say STDERR "Registered callback for keyword '$key'";
     $named_lexed_stack{$key} = $callback;
 }
 
@@ -83,16 +83,16 @@ sub call_lexed
 {
     my ($name, $stream) = @_;
 
-    $DEBUG and say "Checking for callbacks for keyword '$name'";
-    $DEBUG and say Dumper $stream;
+    $DEBUG and say STDERR "Checking for callbacks for keyword '$name'";
+    $DEBUG and say STDERR Dumper $stream;
 
     my $callback = $named_lexed_stack{$name};
     if($callback) {
-        $DEBUG and say "Found callback '$callback' for keyword '$name'";
+        $DEBUG and say STDERR "Found callback '$callback' for keyword '$name'";
         $stream = &$callback($stream);
     }
 
-    $DEBUG and say Dumper $stream;
+    $DEBUG and say STDERR Dumper $stream;
 
     return $stream;
 }
@@ -105,7 +105,8 @@ sub lexer
 
     my $linestr = Devel::Declare::get_linestr;
     my $original_linestr = $linestr;
-    $DEBUG and say "Starting with linestr '$linestr'";
+    my $original_offset = $offset;
+    $DEBUG and say STDERR "Starting with linestr '$linestr'";
 
     my @tokens = ();
     tie @tokens, "Devel::Declare::Lexer::Stream";
@@ -117,30 +118,47 @@ sub lexer
     # Skip the declarator
     $offset += Devel::Declare::toke_move_past_token($offset);
     push @tokens, new Devel::Declare::Lexer::Token::Declarator( value => $symbol );
-    $DEBUG and say "Skipped declarator '$symbol'";
+    $DEBUG and say STDERR "Skipped declarator '$symbol'";
 
     my $skipspace = sub {
         $len = Devel::Declare::toke_skipspace($offset);
         if($len > 0) {
             $tok = substr($linestr, $offset, $len);
-            $DEBUG and say "Skipped whitespace '$tok', length [$len]";
+            $DEBUG and say STDERR "Skipped whitespace '$tok', length [$len]";
             push @tokens, new Devel::Declare::Lexer::Token::Whitespace( value => $tok );
             $offset += $len;
+
+            if($tok =~ /\n/) {
+                $DEBUG and say STDERR "Got end of line in skipspace, unusual circumstances";
+                # FIXME really?
+                Devel::Declare::clear_lex_stuff;
+
+                $linestr = Devel::Declare::get_linestr;
+                $original_linestr = $linestr;
+
+                #if($line == 1) {
+                #    $lineoffsets{1} = (length $symbol) + 1;
+                #};
+                #$line++;
+                #$lineoffsets{$line} = $offset;
+
+                $DEBUG and say STDERR "Refreshed linestr [$linestr]";
+            }
         } elsif ($len < 0) {
-            $DEBUG and say "Got end of line in skipspace";
+            $DEBUG and say STDERR "Got end of line in skipspace";
         } elsif ($len == 0) {
-            $DEBUG and say "No whitespace skipped";
+            $DEBUG and say STDERR "No whitespace skipped";
         }
         return $len;
     };
 
     # get the message
-    $DEBUG and say "Linestr length [", length $linestr, "]";
+    $DEBUG and say STDERR "Linestr length [", length $linestr, "]";
     while($offset < length $linestr) {
-        $DEBUG and say "Offset[$offset], Remaining[", substr($linestr, $offset), "]";
+        $DEBUG and say STDERR "Offset[$offset], Remaining[", substr($linestr, $offset), "]";
 
         if(substr($linestr, $offset, 1) eq ';') {
-            $DEBUG and say "Got end of statement";
+            $DEBUG and say STDERR "Got end of statement";
             push @tokens, new Devel::Declare::Lexer::Token::EndOfStatement;
             $offset += 1;
             $eoleos = 1;
@@ -148,7 +166,7 @@ sub lexer
         }
 
         if(substr($linestr, $offset, 2) eq "\n") {
-            $DEBUG and say "Got end of line in loop (current line $line)";
+            $DEBUG and say STDERR "Got end of line in loop (current line $line)";
             push @tokens, new Devel::Declare::Lexer::Token::Newline;
             $offset += 1;
 
@@ -164,7 +182,7 @@ sub lexer
                 # TODO it seems odd that we don't add $len to the
                 # offset... this might come back to bite us later!
                 #$offset += $len - 6;
-                $DEBUG and say "Skipped $len whitespace following EOL, not added to \$offset";
+                $DEBUG and say STDERR "Skipped $len whitespace following EOL, not added to \$offset";
             }
 
             Devel::Declare::clear_lex_stuff;
@@ -178,7 +196,7 @@ sub lexer
             $line++;
             $lineoffsets{$line} = $offset;
 
-            $DEBUG and say "Refreshed linestr [$linestr]";
+            $DEBUG and say STDERR "Refreshed linestr [$linestr]";
             next;
         }
 
@@ -187,21 +205,21 @@ sub lexer
         if(substr($linestr, $offset, 1) =~ /(\{|\[|\()/) {
             my $b = substr($linestr, $offset, 1);
             push @tokens, new Devel::Declare::Lexer::Token::LeftBracket( value => $b );
-            $DEBUG and say "Got left bracket '$b'";
+            $DEBUG and say STDERR "Got left bracket '$b'";
             $offset += 1;
             next;
         }
         if(substr($linestr, $offset, 1) =~ /(\}|\]|\))/) {
             my $b = substr($linestr, $offset, 1);
             push @tokens, new Devel::Declare::Lexer::Token::RightBracket( value => $b );
-            $DEBUG and say "Got right bracket '$b'";
+            $DEBUG and say STDERR "Got right bracket '$b'";
             $offset += 1;
             next;
         }
 
         if(substr($linestr, $offset, 1) =~ /\\/) {
             $tok = substr($linestr, $offset, 1);
-            $DEBUG and say "Got reference operator '$tok'";
+            $DEBUG and say STDERR "Got reference operator '$tok'";
             push @tokens, new Devel::Declare::Lexer::Token::Operator( value => $tok);
             $offset += 1;
             next;
@@ -211,7 +229,7 @@ sub lexer
             # get the sign
             # TODO the variable name is captured later - it should probably be done here
             $tok = substr($linestr, $offset, 1);
-            $DEBUG and say "Got variable '$tok'";
+            $DEBUG and say STDERR "Got variable '$tok'";
             push @tokens, new Devel::Declare::Lexer::Token::Variable( value => $tok );
             $offset += 1;
             next;
@@ -219,14 +237,14 @@ sub lexer
 
         if(substr($linestr, $offset, 1) =~ /[!\+\-\*\/\.><=]/) {
             $tok = substr($linestr, $offset, 1);
-            $DEBUG and say "Got operator '$tok'";
+            $DEBUG and say STDERR "Got operator '$tok'";
             push @tokens, new Devel::Declare::Lexer::Token::Operator( value => $tok );
             $offset += 1;
             next;
         }
 
         if(substr($linestr, $offset, 1) eq ',') {
-            $DEBUG and say "Got a comma";
+            $DEBUG and say STDERR "Got a comma";
             push @tokens, new Devel::Declare::Lexer::Token::Comma;
             $offset += 1;
             next;
@@ -245,10 +263,10 @@ sub lexer
             } else {
                 $len = Devel::Declare::toke_scan_str($offset);
             }
-            $DEBUG and say "Got string type '$strstype', end type '$stretype'";
+            $DEBUG and say STDERR "Got string type '$strstype', end type '$stretype'";
             $tok = Devel::Declare::get_lex_stuff;
             Devel::Declare::clear_lex_stuff;
-            $DEBUG and say "Got string '$tok'";
+            $DEBUG and say STDERR "Got string '$tok'";
             push @tokens, new Devel::Declare::Lexer::Token::String( start => $strstype, end => $stretype, value => $tok );
             # get a new linestr - we might have captured multiple lines
             $linestr = Devel::Declare::get_linestr;
@@ -262,7 +280,7 @@ sub lexer
         $len = Devel::Declare::toke_scan_word($offset, 1);
         if($len) {
             $tok = substr($linestr, $offset, $len);
-            $DEBUG and say "Got token '$tok'";
+            $DEBUG and say STDERR "Got token '$tok'";
             push @tokens, new Devel::Declare::Lexer::Token( value => $tok );
             $offset += $len;
             next;
@@ -271,7 +289,7 @@ sub lexer
     }
 
     # Callback (AT COMPILE TIME) to allow manipulation of the token stream before injection
-    $DEBUG and say Dumper \@tokens;
+    $DEBUG and say STDERR Dumper \@tokens;
     @tokens = @{call_lexed($symbol, \@tokens)};
 
     my $stmt = "";
@@ -282,7 +300,7 @@ sub lexer
     $DEBUG and print "=" x 80, "\n";
 
     if($symbol =~ /^lexer_test$/) {
-        $DEBUG and say "Escaping statement for variable assignment";
+        $DEBUG and say STDERR "Escaping statement for variable assignment";
         $stmt =~ s/\\/\\\\/g;
         $stmt =~ s/\"/\\"/g;
         $stmt =~ s/\$/\\\$/g;
@@ -292,17 +310,17 @@ sub lexer
     } else {
         chomp $stmt;
     }
-    $DEBUG and say "Final statement: [$stmt]";
+    $DEBUG and say STDERR "Final statement: [$stmt]";
 
     my @lcnt = split /\\n/, $stmt;
     my $lc = scalar @lcnt;
     my $lineadjust = $lc - $line;
-    $DEBUG and say "Linecount[$lc] lines[$line] - missing $lineadjust lines";
+    $DEBUG and say STDERR "Linecount[$lc] lines[$line] - missing $lineadjust lines";
 
     # we've got a new linestr, we need to re-fix all our offsets
-    $DEBUG and say "\n\nStarted with linestr [$linestr]";
+    $DEBUG and say STDERR "\n\nStarted with linestr [$linestr]";
     use Data::Dumper;
-    $DEBUG and say Dumper \%lineoffsets;
+    $DEBUG and say STDERR Dumper \%lineoffsets;
 
     for my $l (sort keys %lineoffsets) {
         my $sol = $lineoffsets{$l};
@@ -310,17 +328,17 @@ sub lexer
         my $eol = $lineoffsets{$l + 1} - 1;
         my $diff = $eol - $sol;
         my $substr = substr($linestr, $sol, $diff);
-        $DEBUG and say "\nLine $l, sol[$sol], eol[$eol], diff[$diff], linestr[$linestr], substr[$substr]";
+        $DEBUG and say STDERR "\nLine $l, sol[$sol], eol[$eol], diff[$diff], linestr[$linestr], substr[$substr]";
         substr($linestr, $sol, $diff) = " " x $diff;
     }
 
     # now clear up the last line
-    $DEBUG and say "Still got linestr[$linestr]";
-    my $sol = $line == 1 ? (length $symbol) + 1 : $lineoffsets{$line};
+    $DEBUG and say STDERR "Still got linestr[$linestr]";
+    my $sol = $line == 1 ? (length $symbol) + 1 + $original_offset : $lineoffsets{$line};
     my $eol = (length $linestr) - 1;
     my $diff = $eol - $sol;
     my $substr = substr($linestr, $sol, $diff);
-    $DEBUG and say "Got substr[$substr] sol[$sol] eol[$eol] diff[$diff]";
+    $DEBUG and say STDERR "Got substr[$substr] sol[$sol] eol[$eol] diff[$diff]";
 
     my $newline = "\n" x $lineadjust;
     if($symbol =~ /^lexer_test$/) {
@@ -331,7 +349,7 @@ sub lexer
 
     substr($linestr, $sol, (length $linestr) - $sol - 1) = $newline; # put the rest of the statement in
 
-    $DEBUG and say "Got new linestr[$linestr] from original_linestr[$original_linestr]";
+    $DEBUG and say STDERR "Got new linestr[$linestr] from original_linestr[$original_linestr]";
 
     $DEBUG and print "=" x 80, "\n";
     Devel::Declare::set_linestr($linestr);

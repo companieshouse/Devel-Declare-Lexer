@@ -104,7 +104,18 @@ lexer_test ( {
     def => 4,
 } );|, 'Hashref multiline');
 
-++$tests && is(__LINE__, 107, 'Line numbering (CHECK WHICH LINE THIS IS ON)');
+    lexer_test
+        "test string",
+        $a,
+        $b
+        ;
+++$tests && is($lexed, q|lexer_test
+        "test string",
+        $a,
+        $b
+        ;|, 'Normal multiline');
+
+++$tests && is(__LINE__, 118, 'Line numbering (CHECK WHICH LINE THIS IS ON)');
 
 done_testing $tests;
 
