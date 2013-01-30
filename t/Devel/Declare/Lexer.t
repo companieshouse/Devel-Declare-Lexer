@@ -21,6 +21,8 @@ use Devel::Declare::Lexer::Token::Whitespace;
 
 use Test::More;
 
+#BEGIN { $Devel::Declare::Lexer::DEBUG = 1; }
+
 my $tests = 0;
 my $lexed;
 
@@ -115,7 +117,7 @@ lexer_test ( {
         $b
         ;|, 'Normal multiline');
 
-++$tests && is(__LINE__, 118, 'Line numbering (CHECK WHICH LINE THIS IS ON)');
+++$tests && is(__LINE__, 120, 'Line numbering (CHECK WHICH LINE THIS IS ON)');
 
 done_testing $tests;
 

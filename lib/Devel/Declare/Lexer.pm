@@ -308,6 +308,7 @@ sub lexer
         chomp $stmt;
         $stmt = substr($stmt, 0, (length $stmt) - 2); # strip the final \\n
     } else {
+        $stmt =~ s/\n//g; # remove multiline on final statement
         chomp $stmt;
     }
     $DEBUG and say STDERR "Final statement: [$stmt]";
