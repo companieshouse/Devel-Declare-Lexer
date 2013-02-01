@@ -7,18 +7,6 @@ use warnings;
 #use Devel::Declare::Lexer qw/ :lexer_test /; # creates a lexer_test keyword and places lexed code into runtime $lexed
 use Devel::Declare::Lexer qw/ :lexer_test lexer_test2 /; # creates a lexer_test keyword and places lexed code into runtime $lexed
 
-use Devel::Declare::Lexer::Token;
-use Devel::Declare::Lexer::Token::Comma;
-use Devel::Declare::Lexer::Token::Declarator;
-use Devel::Declare::Lexer::Token::EndOfStatement;
-use Devel::Declare::Lexer::Token::LeftBracket;
-use Devel::Declare::Lexer::Token::Newline;
-use Devel::Declare::Lexer::Token::Operator;
-use Devel::Declare::Lexer::Token::RightBracket;
-use Devel::Declare::Lexer::Token::String;
-use Devel::Declare::Lexer::Token::Variable;
-use Devel::Declare::Lexer::Token::Whitespace;
-
 use Test::More;
 
 #BEGIN { $Devel::Declare::Lexer::DEBUG = 1; }
@@ -117,7 +105,7 @@ lexer_test ( {
         $b
         ;|, 'Normal multiline');
 
-++$tests && is(__LINE__, 120, 'Line numbering (CHECK WHICH LINE THIS IS ON)');
+++$tests && is(__LINE__, 108, 'Line numbering (CHECK WHICH LINE THIS IS ON)');
 
 done_testing $tests;
 

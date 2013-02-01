@@ -10,7 +10,7 @@ use Data::Dumper;
 use Devel::Declare;
 use Devel::Declare::Lexer::Stream;
 use Devel::Declare::Lexer::Token;
-use Devel::Declare::Lexer::Token::Comma;
+use Devel::Declare::Lexer::Token::Bareword;
 use Devel::Declare::Lexer::Token::Declarator;
 use Devel::Declare::Lexer::Token::EndOfStatement;
 use Devel::Declare::Lexer::Token::LeftBracket;
@@ -120,7 +120,9 @@ sub lexer
     push @tokens, new Devel::Declare::Lexer::Token::Declarator( value => $symbol );
     $DEBUG and say STDERR "Skipped declarator '$symbol'";
 
+    # We call this from a few places inside the loop
     my $skipspace = sub {
+        # Move past any whitespace
         $len = Devel::Declare::toke_skipspace($offset);
         if($len > 0) {
             $tok = substr($linestr, $offset, $len);
@@ -129,22 +131,20 @@ sub lexer
             $offset += $len;
 
             if($tok =~ /\n/) {
-                $DEBUG and say STDERR "Got end of line in skipspace, unusual circumstances";
-                # FIXME really?
+                # its odd that this works without handling any line numbering
+                # I think we end up here when an end of line is found after a bareword (e.g. print\n"something")
+                # It probably still needs some work on line numbering, but everything just seems to work! 
+                $DEBUG and say STDERR "Got end of line in skipspace, probable bareword preceeding EOL";
                 Devel::Declare::clear_lex_stuff;
 
+                # We've got a new line so we need to refresh our linestr
                 $linestr = Devel::Declare::get_linestr;
                 $original_linestr = $linestr;
-
-                #if($line == 1) {
-                #    $lineoffsets{1} = (length $symbol) + 1;
-                #};
-                #$line++;
-                #$lineoffsets{$line} = $offset;
 
                 $DEBUG and say STDERR "Refreshed linestr [$linestr]";
             }
         } elsif ($len < 0) {
+            # Again, its odd that we don't handle any line numbering here, and a $len of < 0 is a definite EOL
             $DEBUG and say STDERR "Got end of line in skipspace";
         } elsif ($len == 0) {
             $DEBUG and say STDERR "No whitespace skipped";
@@ -152,7 +152,7 @@ sub lexer
         return $len;
     };
 
-    # get the message
+    # Capture the tokens
     $DEBUG and say STDERR "Linestr length [", length $linestr, "]";
     while($offset < length $linestr) {
         $DEBUG and say STDERR "Offset[$offset], Remaining[", substr($linestr, $offset), "]";
@@ -170,10 +170,14 @@ sub lexer
             push @tokens, new Devel::Declare::Lexer::Token::Newline;
             $offset += 1;
 
+            # this lets us capture a newline directly after a semicolon
+            # and immediately exit the loop - otherwise we might start
+            # consuming code that doesn't belong to us
             last if $eoleos;
             $eoleos = 0;
 
-            # we're actually consuming a new line now
+            # If we're here, it's just a new line inside the statement that 
+            # we do want to consume
 
             # We don't use skipspace here - it does too much!
             #&$skipspace;
@@ -187,9 +191,14 @@ sub lexer
 
             Devel::Declare::clear_lex_stuff;
 
+            # Got a new line, so we need to refresh linestr
             $linestr = Devel::Declare::get_linestr;
+            # It's not the next line, its everything upto and including the next line
+            # so really our original_linestr is wrong!
             $original_linestr = $linestr;
 
+            # Record some offsets for later - we start on line 1 and the first $line++ is 2
+            # so we make a special case for recording line 1's offset
             if($line == 1) {
                 $lineoffsets{1} = (length $symbol) + 1;
             };
@@ -200,8 +209,10 @@ sub lexer
             next;
         }
 
+        # FIXME Does this ever happen?
         last if &$skipspace < 0;
 
+        # Check if its a opening bracket
         if(substr($linestr, $offset, 1) =~ /(\{|\[|\()/) {
             my $b = substr($linestr, $offset, 1);
             push @tokens, new Devel::Declare::Lexer::Token::LeftBracket( value => $b );
@@ -209,6 +220,7 @@ sub lexer
             $offset += 1;
             next;
         }
+        # Check if its a closing bracket
         if(substr($linestr, $offset, 1) =~ /(\}|\]|\))/) {
             my $b = substr($linestr, $offset, 1);
             push @tokens, new Devel::Declare::Lexer::Token::RightBracket( value => $b );
@@ -216,7 +228,7 @@ sub lexer
             $offset += 1;
             next;
         }
-
+        # Check for a reference
         if(substr($linestr, $offset, 1) =~ /\\/) {
             $tok = substr($linestr, $offset, 1);
             $DEBUG and say STDERR "Got reference operator '$tok'";
@@ -224,7 +236,7 @@ sub lexer
             $offset += 1;
             next;
         }
-
+        # Check for variable
         if(substr($linestr, $offset, 1) =~ /(\$|\%|\@|\*)/) {
             # get the sign
             # TODO the variable name is captured later - it should probably be done here
@@ -234,22 +246,15 @@ sub lexer
             $offset += 1;
             next;
         }
-
-        if(substr($linestr, $offset, 1) =~ /[!\+\-\*\/\.><=]/) {
+        # Check for operator
+        if(substr($linestr, $offset, 1) =~ /[!\+\-\*\/\.><=,]/) {
             $tok = substr($linestr, $offset, 1);
             $DEBUG and say STDERR "Got operator '$tok'";
             push @tokens, new Devel::Declare::Lexer::Token::Operator( value => $tok );
             $offset += 1;
             next;
         }
-
-        if(substr($linestr, $offset, 1) eq ',') {
-            $DEBUG and say STDERR "Got a comma";
-            push @tokens, new Devel::Declare::Lexer::Token::Comma;
-            $offset += 1;
-            next;
-        }
-
+        # Check for string
         if(substr($linestr, $offset, 1) =~ /^(q|\"|\')/) {
             # FIXME need to determine string type properly
             my $strstype = substr($linestr, $offset, 1);
@@ -276,12 +281,12 @@ sub lexer
 
             next;
         }
-
+        # Check for bareword
         $len = Devel::Declare::toke_scan_word($offset, 1);
         if($len) {
             $tok = substr($linestr, $offset, $len);
-            $DEBUG and say STDERR "Got token '$tok'";
-            push @tokens, new Devel::Declare::Lexer::Token( value => $tok );
+            $DEBUG and say STDERR "Got bareword '$tok'";
+            push @tokens, new Devel::Declare::Lexer::Token::Bareword( value => $tok );
             $offset += $len;
             next;
         }
