@@ -13,6 +13,7 @@ use Devel::Declare::Lexer::Token;
 use Devel::Declare::Lexer::Token::Bareword;
 use Devel::Declare::Lexer::Token::Declarator;
 use Devel::Declare::Lexer::Token::EndOfStatement;
+use Devel::Declare::Lexer::Token::Heredoc;
 use Devel::Declare::Lexer::Token::LeftBracket;
 use Devel::Declare::Lexer::Token::Newline;
 use Devel::Declare::Lexer::Token::Operator;
@@ -112,13 +113,14 @@ sub lexer
     tie @tokens, "Devel::Declare::Lexer::Stream";
     my ($len, $tok);
     my $eoleos = 0;
-    my %lineoffsets;
     my $line = 1;
 
     # Skip the declarator
     $offset += Devel::Declare::toke_move_past_token($offset);
     push @tokens, new Devel::Declare::Lexer::Token::Declarator( value => $symbol );
     $DEBUG and say STDERR "Skipped declarator '$symbol'";
+
+    my %lineoffsets = ( 1 => $offset );
 
     # We call this from a few places inside the loop
     my $skipspace = sub {
@@ -154,7 +156,32 @@ sub lexer
 
     # Capture the tokens
     $DEBUG and say STDERR "Linestr length [", length $linestr, "]";
+    my $heredoc = undef;
+    my $heredoc_end_re = undef;
     while($offset < length $linestr) {
+        $DEBUG and say STDERR Dumper \%lineoffsets;
+        if($heredoc && !(substr($linestr, $offset, 2) eq "\n")) {
+            my $c = substr($linestr, $offset, 1);
+            $DEBUG and say STDERR "Consuming char from heredoc: '$c'";
+            $offset += 1;
+            if($c =~ /\n/) {
+                $DEBUG and say STDERR "Newline found in heredoc (current line $line)";
+                #$line++;
+                #$lineoffsets{$line} = $offset;
+            }
+            $heredoc->{value} .= $c;
+            $DEBUG and say STDERR "New heredoc value: " . $heredoc->{value};
+            my $heredoc_name = $heredoc->{name};
+            if($heredoc->{value} =~ /$heredoc_end_re/) {
+                $heredoc->{value} =~ s/$heredoc_end_re//;
+                $DEBUG and say STDERR "Consumed heredoc, name [$heredoc_name]:\n" . $heredoc->{value};
+                push @tokens, $heredoc;
+                $heredoc = undef;
+                $heredoc_end_re = undef;
+            }
+            next;
+        }
+
         $DEBUG and say STDERR "Offset[$offset], Remaining[", substr($linestr, $offset), "]";
 
         if(substr($linestr, $offset, 1) eq ';') {
@@ -166,9 +193,16 @@ sub lexer
         }
 
         if(substr($linestr, $offset, 2) eq "\n") {
-            $DEBUG and say STDERR "Got end of line in loop (current line $line)";
-            push @tokens, new Devel::Declare::Lexer::Token::Newline;
-            $offset += 1;
+            if($heredoc) {
+                $DEBUG and say STDERR "Got end of line in heredoc";
+                $heredoc->{value} .= "\n";
+            }
+
+            if(!$heredoc) {
+                $DEBUG and say STDERR "Got end of line in loop (current line $line)";
+                push @tokens, new Devel::Declare::Lexer::Token::Newline;
+                $offset += 1;
+            }
 
             # this lets us capture a newline directly after a semicolon
             # and immediately exit the loop - otherwise we might start
@@ -203,9 +237,9 @@ sub lexer
                 $lineoffsets{1} = (length $symbol) + 1;
             };
             $line++;
-            $lineoffsets{$line} = $offset;
+            $lineoffsets{$line} = $heredoc ? $offset + 1 : $offset;
 
-            $DEBUG and say STDERR "Refreshed linestr [$linestr]";
+            $DEBUG and say STDERR "Refreshed linestr [$linestr], added lineoffset for line $line, offset $offset";
             next;
         }
 
@@ -246,23 +280,20 @@ sub lexer
             $offset += 1;
             next;
         }
-        # Check for operator
-        if(substr($linestr, $offset, 1) =~ /[!\+\-\*\/\.><=,]/) {
-            $tok = substr($linestr, $offset, 1);
-            $DEBUG and say STDERR "Got operator '$tok'";
-            push @tokens, new Devel::Declare::Lexer::Token::Operator( value => $tok );
-            $offset += 1;
-            next;
-        }
         # Check for string
         if(substr($linestr, $offset, 1) =~ /^(q|\"|\')/) {
             # FIXME need to determine string type properly
             my $strstype = substr($linestr, $offset, 1);
             my $stretype = $strstype;
             if($strstype =~ /q/) {
-                $offset += 1;
-                $strstype .= substr($linestr, $offset, 1);
-                $stretype = substr($strstype, 1);
+                if(substr($linestr, $offset, 2) =~ /qq/) {
+                    $strstype = substr($linestr, $offset, 3);
+                    $offset += 2;
+                } else {
+                    $strstype = substr($linestr, $offset, 2);
+                    $offset += 1;
+                }
+                $stretype = substr($linestr, $offset, 1);
                 $stretype =~ tr/\(/)/;
                 $len = Devel::Declare::toke_scan_str($offset);
             } else {
@@ -279,6 +310,37 @@ sub lexer
 
             # If we do have multiple lines, we'll fix line numbering at the end
 
+            next;
+        }
+        # Check for heredoc
+        if(substr($linestr, $offset)=~ /^(<<\s*([\w\d]+)\s*\n)/) {
+            # Heredocs are weird - we'll just remember we're in a heredoc until we get the end token
+            $DEBUG and say STDERR "Got a heredoc with name '$2'";
+            $heredoc = new Devel::Declare::Lexer::Token::Heredoc( name => $2, value => '' );
+            $heredoc_end_re = qr/\n$2\n/;
+            $DEBUG and say STDERR "Created regex $heredoc_end_re";
+
+            # get a new linestr - we might have captured multiple lines
+            $offset += 2 + (length $1);
+    
+            $len = Devel::Declare::toke_skipspace($offset);
+            $linestr = Devel::Declare::get_linestr;
+            $offset += $len;
+            $DEBUG and say STDERR "Skipped $len whitespace at start of heredoc, got new linestr[$linestr]";
+
+            $line++;
+            $lineoffsets{$line} = $offset;
+
+            # If we do have multiple lines, we'll fix line numbering at the end
+
+            next;
+        }
+        # Check for operator after strings (so heredocs <<NAME work)
+        if(substr($linestr, $offset, 1) =~ /[!\+\-\*\/\.><=,]/) {
+            $tok = substr($linestr, $offset, 1);
+            $DEBUG and say STDERR "Got operator '$tok'";
+            push @tokens, new Devel::Declare::Lexer::Token::Operator( value => $tok );
+            $offset += 1;
             next;
         }
         # Check for bareword
