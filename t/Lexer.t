@@ -80,10 +80,7 @@ lexer_test q(this
 is
 a
 multiline);
-++$tests && is($lexed, q|lexer_test q(this
-is
-a
-multiline);|, 'q quoting operator with multiline');
+++$tests && is($lexed, q|lexer_test q(this\nis\na\nmultiline);|, 'q quoting operator with multiline');
 
 lexer_test ( {
     abc => 2,
@@ -105,7 +102,7 @@ lexer_test ( {
         $b
         ;|, 'Normal multiline');
 
-++$tests && is(__LINE__, 108, 'Line numbering (CHECK WHICH LINE THIS IS ON)');
+++$tests && is(__LINE__, 105, 'Line numbering (CHECK WHICH LINE THIS IS ON)');
 
 done_testing $tests;
 

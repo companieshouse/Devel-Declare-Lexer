@@ -39,19 +39,55 @@ test $s = qq(the qq operator);
 test $s = qq(Some string interpolation with '$s');
 ++$tests && is($s, "Some string interpolation with 'the qq operator'", 'String interpolation with qq operator');
 
+my $a = <<EOF
+This is a heredoc
+EOF
+;
 test $s = <<EOF
 This is a heredoc
 EOF
 ;
-++$tests && is($s, 'This is a heredoc', 'Heredocs');
+++$tests && is($s, $a, 'Heredocs');
 
-#FIXME this causes line numbering problems
-#test $s = q(
-#A multiline q test
-#);
-#++$tests && is($s, "A multiline q test", 'Multiline q test');
+my $b = "Multiline
+test
+with
+double
+quotes";
+test $s = "Multiline
+test
+with
+double
+quotes";
+++$tests && is($s, $b, 'Double quoted multiline');
 
-++$tests && is(__LINE__, 54, 'Line numbering (CHECK WHICH LINE THIS IS ON)');
+# This is an odd one... since q is equivalent to ', a \n doesn't get
+# turned into a newline, at least not when we re-output the code from
+# the lexer... and since we can't output across multiple lines,
+# we end up with a string literally containing \n's!
+my $c = q(\nA multiline q test\n);
+test $s = q(
+A multiline q test
+);
+++$tests && is($s, $c, 'Multiline q test');
+
+my $d = qq(
+A multiline qq test
+);
+test $s = qq(
+A multiline qq test
+);
+++$tests && is($s, $d, 'Multiline qq test');
+
+my $e = qq(
+String interpolation in a '$s'
+);
+test $s = qq(
+String interpolation in a '$s'
+);
+++$tests && is($s, $e, 'String interpolation in multiline qq');
+
+++$tests && is(__LINE__, 90, 'Line numbering (CHECK WHICH LINE THIS IS ON)');
 
 done_testing $tests;
 

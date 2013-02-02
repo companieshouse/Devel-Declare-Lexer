@@ -18,7 +18,9 @@ sub get
     my ($self) = @_;
 
 #    return '<<' . $self->{name} . "\n" . $self->{value}; # value currently contains end name
-    return '"' . $self->{value} . '"'; # value currently contains end name
+    my $v = $self->{value};
+    $v =~ s/\n/\\n/g;
+    return '"' . $v . '"'; # value currently contains end name
 }
 
 1;

@@ -158,6 +158,7 @@ sub lexer
     $DEBUG and say STDERR "Linestr length [", length $linestr, "]";
     my $heredoc = undef;
     my $heredoc_end_re = undef;
+    my $heredoc_end_re2 = undef;
     while($offset < length $linestr) {
         $DEBUG and say STDERR Dumper \%lineoffsets;
         if($heredoc && !(substr($linestr, $offset, 2) eq "\n")) {
@@ -168,16 +169,18 @@ sub lexer
                 $DEBUG and say STDERR "Newline found in heredoc (current line $line)";
                 #$line++;
                 #$lineoffsets{$line} = $offset;
+            } else {
+                $heredoc->{value} .= $c;
             }
-            $heredoc->{value} .= $c;
             $DEBUG and say STDERR "New heredoc value: " . $heredoc->{value};
             my $heredoc_name = $heredoc->{name};
             if($heredoc->{value} =~ /$heredoc_end_re/) {
-                $heredoc->{value} =~ s/$heredoc_end_re//;
+                $heredoc->{value} =~ s/$heredoc_end_re2//;
                 $DEBUG and say STDERR "Consumed heredoc, name [$heredoc_name]:\n" . $heredoc->{value};
                 push @tokens, $heredoc;
                 $heredoc = undef;
                 $heredoc_end_re = undef;
+                $heredoc_end_re2 = undef;
             }
             next;
         }
@@ -317,8 +320,9 @@ sub lexer
             # Heredocs are weird - we'll just remember we're in a heredoc until we get the end token
             $DEBUG and say STDERR "Got a heredoc with name '$2'";
             $heredoc = new Devel::Declare::Lexer::Token::Heredoc( name => $2, value => '' );
-            $heredoc_end_re = qr/\n$2\n/;
-            $DEBUG and say STDERR "Created regex $heredoc_end_re";
+            $heredoc_end_re = qr/\n$2\n$/;
+            $heredoc_end_re2 = qr/$2\n$/;
+            $DEBUG and say STDERR "Created regex $heredoc_end_re and $heredoc_end_re2";
 
             # get a new linestr - we might have captured multiple lines
             $offset += 2 + (length $1);
