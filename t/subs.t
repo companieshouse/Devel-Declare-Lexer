@@ -47,11 +47,17 @@ BEGIN {
         }
 
         push @output, @start;
-        push @output, new Devel::Declare::Lexer::Token::Variable( value => '*{Devel::Declare::Lexer::t::' . $name->{value} . '}' );
-        push @output, new Devel::Declare::Lexer::Token::Whitespace( value => ' ' );
-        push @output, new Devel::Declare::Lexer::Token::Operator( value => '=' );
-        push @output, new Devel::Declare::Lexer::Token::Whitespace( value => ' ' );
+        # Terminate the existing statement
+        push @output, new Devel::Declare::Lexer::Token::Bareword( value => '1' );
+        push @output, new Devel::Declare::Lexer::Token::EndOfStatement( value => ';' );
+
+        # Add the sub keyword/name
         push @output, new Devel::Declare::Lexer::Token::Bareword( value => 'sub' );
+        push @output, new Devel::Declare::Lexer::Token::Whitespace( value => ' ' );
+        push @output, $name;
+        push @output, new Devel::Declare::Lexer::Token::Whitespace( value => ' ' );
+
+        # Output the 'my (...) = @_;' line
         push @output, new Devel::Declare::Lexer::Token::Whitespace( value => ' ' );
         push @output, shift @stream; # consume the {
         push @output, new Devel::Declare::Lexer::Token::Bareword( value => 'my' );
@@ -68,6 +74,8 @@ BEGIN {
         push @output, new Devel::Declare::Lexer::Token::Whitespace( value => ' ' );
         push @output, new Devel::Declare::Lexer::Token::Variable( value => '@_' );
         push @output, new Devel::Declare::Lexer::Token::EndOfStatement( value => ';' );
+
+        # Stick everything else back on the end
         push @output, @stream;
 
         return \@output;
@@ -89,7 +97,8 @@ test $s = sub {
 # Its fine because the rest doesn't matter, for this example, and all remaining lines are left intact!
 # 
 # This also means that any Lexer keywords used after the first line of the function will get parsed properly
-# 
+#
+# FIXME this probably means the lexers understanding of blocks needs improving - i.e., nested bracket tracking
 # TODO add a callback to control when the lexer ends, so we can stop at the first {
 # (or skip past the first ;?
 function something ($a, $b) {
@@ -97,7 +106,7 @@ function something ($a, $b) {
 };
 ++$tests && is(something(1,2), 15, 'Function definition');
 
-++$tests && is(__LINE__, 100, 'Line numbering (CHECK WHICH LINE THIS IS ON)');
+++$tests && is(__LINE__, 109, 'Line numbering (CHECK WHICH LINE THIS IS ON)');
 
 done_testing $tests;
 
