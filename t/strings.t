@@ -45,7 +45,13 @@ EOF
 ;
 ++$tests && is($s, 'This is a heredoc', 'Heredocs');
 
-++$tests && is(__LINE__, 48, 'Line numbering (CHECK WHICH LINE THIS IS ON)');
+#FIXME this causes line numbering problems
+#test $s = q(
+#A multiline q test
+#);
+#++$tests && is($s, "A multiline q test", 'Multiline q test');
+
+++$tests && is(__LINE__, 54, 'Line numbering (CHECK WHICH LINE THIS IS ON)');
 
 done_testing $tests;
 
