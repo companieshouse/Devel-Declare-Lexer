@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use v5;
 
-our $VERSION = '0.002';
+our $VERSION = '0.003';
 
 use Data::Dumper;
 use Devel::Declare;
@@ -504,12 +504,14 @@ taking care of multiline strings or code blocks - it's all done for you.
 
 =head1 SEE ALSO
 
-For more information about how L<Devel::Declare::Lexer>works , read the 
+Some examples can be found in the source download.
+
+For more information about how L<Devel::Declare::Lexer> works, read the 
 documentation for L<Devel::Declare>.
 
 =head1 AUTHORS
 
-Ian Kent - E<lt>email@iankent.co.uk<gt> - original author
+Ian Kent - E<iankent@cpan.org> - original author
 
 http://www.iankent.co.uk/
 
