@@ -159,6 +159,7 @@ sub lexer
     my $heredoc = undef;
     my $heredoc_end_re = undef;
     my $heredoc_end_re2 = undef;
+    my $nest = 0; # nested bracket tracking, just in case we get ; inside a block
     while($offset < length $linestr) {
         $DEBUG and say STDERR Dumper \%lineoffsets;
         if($heredoc && !(substr($linestr, $offset, 2) eq "\n")) {
@@ -210,7 +211,7 @@ sub lexer
             # this lets us capture a newline directly after a semicolon
             # and immediately exit the loop - otherwise we might start
             # consuming code that doesn't belong to us
-            last if $eoleos;
+            last if $eoleos && !$nest;
             $eoleos = 0;
 
             # If we're here, it's just a new line inside the statement that 
@@ -253,7 +254,8 @@ sub lexer
         if(substr($linestr, $offset, 1) =~ /(\{|\[|\()/) {
             my $b = substr($linestr, $offset, 1);
             push @tokens, new Devel::Declare::Lexer::Token::LeftBracket( value => $b );
-            $DEBUG and say STDERR "Got left bracket '$b'";
+            $nest++;
+            $DEBUG and say STDERR "Got left bracket '$b', nest[$nest]";
             $offset += 1;
             next;
         }
@@ -261,7 +263,8 @@ sub lexer
         if(substr($linestr, $offset, 1) =~ /(\}|\]|\))/) {
             my $b = substr($linestr, $offset, 1);
             push @tokens, new Devel::Declare::Lexer::Token::RightBracket( value => $b );
-            $DEBUG and say STDERR "Got right bracket '$b'";
+            $nest--;
+            $DEBUG and say STDERR "Got right bracket '$b', nest[$nest]";
             $offset += 1;
             next;
         }
@@ -384,8 +387,11 @@ sub lexer
     }
     $DEBUG and say STDERR "Final statement: [$stmt]";
 
+    # FIXME line numbering is broken if a \n appears inside a block, e.g. keyword { print "\n"; }
+    #my @lcnt = split /[^\\]\\n/, $stmt;
     my @lcnt = split /\\n/, $stmt;
     my $lc = scalar @lcnt;
+    $DEBUG and say STDERR "Lines:\n", Dumper \@lcnt;
     my $lineadjust = $lc - $line;
     $DEBUG and say STDERR "Linecount[$lc] lines[$line] - missing $lineadjust lines";
 
