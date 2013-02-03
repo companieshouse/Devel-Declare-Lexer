@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use v5;
 
-our $VERSION = '0.005';
+our $VERSION = '0.006';
 
 use Data::Dumper;
 use Devel::Declare;
