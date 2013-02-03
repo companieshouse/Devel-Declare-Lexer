@@ -182,16 +182,18 @@ sub _if
     push @tokens, @$then;
     push @tokens, new Devel::Declare::Lexer::Token::RightBracket( value => '}' );
 
-    my @elsif = @$elsifs;
-    if(scalar @elsif > 0) {
-        for my $eif (@elsif) {
-            push @tokens, new Devel::Declare::Lexer::Token::Bareword( value => 'elsif' );
-            push @tokens, new Devel::Declare::Lexer::Token::LeftBracket( value => '(' );
-            push @tokens, @{$eif->{condition}};
-            push @tokens, new Devel::Declare::Lexer::Token::RightBracket( value => ')' );
-            push @tokens, new Devel::Declare::Lexer::Token::LeftBracket( value => '{' );
-            push @tokens, @{$eif->{then}};
-            push @tokens, new Devel::Declare::Lexer::Token::RightBracket( value => '}' );
+    if($elsifs) {
+        my @elsif = @$elsifs;
+        if(scalar @elsif > 0) {
+            for my $eif (@elsif) {
+                push @tokens, new Devel::Declare::Lexer::Token::Bareword( value => 'elsif' );
+                push @tokens, new Devel::Declare::Lexer::Token::LeftBracket( value => '(' );
+                push @tokens, @{$eif->{condition}};
+                push @tokens, new Devel::Declare::Lexer::Token::RightBracket( value => ')' );
+                push @tokens, new Devel::Declare::Lexer::Token::LeftBracket( value => '{' );
+                push @tokens, @{$eif->{then}};
+                push @tokens, new Devel::Declare::Lexer::Token::RightBracket( value => '}' );
+            }
         }
     }
 
