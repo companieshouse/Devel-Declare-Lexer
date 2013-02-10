@@ -21,6 +21,7 @@ t/Lexer.t
 t/Raw.t
 t/strings.t
 t/subs.t
+t/inject.t
 README
 Makefile.PL
 MANIFEST

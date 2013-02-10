@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use v5;
 
-our $VERSION = '0.006';
+our $VERSION = '0.007';
 
 use Data::Dumper;
 use Devel::Declare;
@@ -40,6 +40,14 @@ sub import_for
     my $class = shift;
 
     no strict 'refs';
+
+    my %subinject = ();
+    if(ref($args[0]) =~ /HASH/) {
+        $DEBUG and say STDERR "Using hash for import";
+        %subinject = %{$args[0]};
+        @args = keys %subinject;
+    }
+
     my @consts;
 
     my %tags = map { $_ => 1 } @args;
@@ -52,7 +60,7 @@ sub import_for
         push @consts, "lexer_test";
     }
 
-    my @names = @_;
+    my @names = @args;
     for my $name (@names) {
         next if $name =~ /:/;
         $DEBUG and say STDERR "Adding '$name' to keyword list";
@@ -68,7 +76,11 @@ sub import_for
                 $word => { const => \&lexer }
             }
         );
-        *{$caller.'::'.$word} = sub () { 1; };
+        if($subinject{$word}) {
+            *{$caller.'::'.$word} = $subinject{$word};
+        } else {
+            *{$caller.'::'.$word} = sub () { 1; };
+        }
     }
 }
 
@@ -507,6 +519,19 @@ into
 
 Unlike L<Devel::Declare>, there's no need to worry about parsing text and
 taking care of multiline strings or code blocks - it's all done for you.
+
+=head1 ADVANCED USAGE
+
+L<Devel::Declare::Lexer>'s standard behaviour is to inject a sub into the
+calling package which returns a 1. Because your statement typically gets
+transformed into something like
+    keyword and [your statement here];
+the fact keyword evaluates to 1 means everything following the and will always
+be executed.
+
+You can extend this by using a different import syntax when loading L<Devel::Declare::Lexer>
+    use Devel::Declare::Lexer { keyword => sub { $Some::Package::variable } };
+which will cause the provided sub to be injected instead of the default sub.
 
 =head1 SEE ALSO
 
