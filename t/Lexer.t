@@ -9,7 +9,7 @@ use Devel::Declare::Lexer qw/ :lexer_test lexer_test2 /; # creates a lexer_test 
 
 use Test::More;
 
-#BEGIN { $Devel::Declare::Lexer::DEBUG = 1; }
+BEGIN { $Devel::Declare::Lexer::DEBUG = 1; }
 
 my $tests = 0;
 my $lexed;
@@ -76,6 +76,9 @@ lexer_test ( $$ln_ref );
 lexer_test q(this is a string);
 ++$tests && is($lexed, q|lexer_test q(this is a string);|, 'q quoting operator');
 
+lexer_test abc();
+++$tests && is($lexed, q|lexer_test abc();|, 'sub call with parentheses');
+
 lexer_test q(this
 is
 a
@@ -116,7 +119,16 @@ lexer_test {
     print "...";
 };|, 'Block');
 
-++$tests && is(__LINE__, 119, 'Line numbering (CHECK WHICH LINE THIS IS ON)');
+lexer_test 1 || 1;
+++$tests && is($lexed, q/lexer_test 1 || 1;/, 'Or in statement');
+
+lexer_test 1 && 1;
+++$tests && is($lexed, q/lexer_test 1 && 1;/, 'And in statement');
+
+lexer_test 1 |= 1;
+++$tests && is($lexed, q/lexer_test 1 |= 1;/, 'Or equals in statement');
+
+++$tests && is(__LINE__, 131, 'Line numbering (CHECK WHICH LINE THIS IS ON)');
 
 done_testing $tests;
 
