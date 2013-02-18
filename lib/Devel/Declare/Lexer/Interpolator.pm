@@ -44,9 +44,9 @@ sub deinterpolate {
     for my $char (@chars) {
         push @procd, $char;
         $pos++;
-        $DEBUG and say STDERR "Got char '$char'";
+        $DEBUG and say STDERR "Got char '$char' at pos $pos";
 
-        if($char =~ /\s/ && $tok) {
+        if($char =~ /[\s,\\]/ && $tok) {
             $DEBUG and say STDERR "    Captured token '$tok' at pos $pos";
             push @vars, {
                 token => $tok,
