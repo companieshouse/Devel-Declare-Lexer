@@ -1,4 +1,4 @@
-package Devel::Declare::Lexer::Interpolator;
+package Devel::Declare::Lexer::Token::String::Interpolator;
 
 use strict;
 use warnings;
