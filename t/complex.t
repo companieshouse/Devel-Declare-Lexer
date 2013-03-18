@@ -49,7 +49,11 @@ my $eh = bless {}, 'dummy_package';
 lexer_test "skipping event ".$eh->get_name if $eventName ne $eh->get_name;
 ++$tests && is($lexed, q/lexer_test "skipping event ".$eh->get_name if $eventName ne $eh->get_name;/, 'Complex');
 
-++$tests && is(__LINE__, 52, 'Line numbering (CHECK WHICH LINE THIS IS ON)');
+my $isweak = 1;
+lexer_test "Is event handler weak?  ".($isweak ? 'Yes' : 'No')."\n";
+++$tests && is($lexed, q/lexer_test "Is event handler weak?  ".($isweak ? 'Yes' : 'No')."\n";/, 'Complex');
+
+++$tests && is(__LINE__, 56, 'Line numbering (CHECK WHICH LINE THIS IS ON)');
 
 done_testing $tests;
 

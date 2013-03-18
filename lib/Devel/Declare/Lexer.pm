@@ -355,7 +355,8 @@ sub lexer
             next;
         }
         # Check for operator after strings (so heredocs <<NAME work)
-        if(substr($linestr, $offset, 1) =~ /[!\+\-\*\/\.><=,|&]/) {
+print "ABC:: '", substr($linestr, $offset, 1), "'\n";
+        if(substr($linestr, $offset, 1) =~ /[!\+\-\*\/\.><=,|&\?:]/) {
             $tok = substr($linestr, $offset, 1);
             $DEBUG and say STDERR "Got operator '$tok'";
             push @tokens, new Devel::Declare::Lexer::Token::Operator( value => $tok );
