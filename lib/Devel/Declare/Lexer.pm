@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use v5;
 
-our $VERSION = '0.010';
+our $VERSION = '0.011';
 
 use Data::Dumper;
 use Devel::Declare;
@@ -355,7 +355,6 @@ sub lexer
             next;
         }
         # Check for operator after strings (so heredocs <<NAME work)
-print "ABC:: '", substr($linestr, $offset, 1), "'\n";
         if(substr($linestr, $offset, 1) =~ /[!\+\-\*\/\.><=,|&\?:]/) {
             $tok = substr($linestr, $offset, 1);
             $DEBUG and say STDERR "Got operator '$tok'";
