@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use v5;
 
-our $VERSION = '0.011';
+our $VERSION = '0.012';
 
 use Data::Dumper;
 use Devel::Declare;
@@ -25,6 +25,7 @@ use Devel::Declare::Lexer::Token::Whitespace;
 use vars qw/ @ISA $DEBUG /;
 @ISA = ();
 $DEBUG = 0;
+$SHOWTRANSLATE = 0;
 
 sub import
 {
@@ -439,7 +440,7 @@ sub lexer
 
     substr($linestr, $sol, (length $linestr) - $sol - 1) = $newline; # put the rest of the statement in
 
-    $DEBUG and say STDERR "Got new linestr[$linestr] from original_linestr[$original_linestr]";
+    ($DEBUG || $SHOWTRANSLATE) and say STDERR "Got new linestr[$linestr] from original_linestr[$original_linestr]";
 
     $DEBUG and print "=" x 80, "\n";
     Devel::Declare::set_linestr($linestr);
