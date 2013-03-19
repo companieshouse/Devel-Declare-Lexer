@@ -22,7 +22,7 @@ use Devel::Declare::Lexer::Token::String;
 use Devel::Declare::Lexer::Token::Variable;
 use Devel::Declare::Lexer::Token::Whitespace;
 
-use vars qw/ @ISA $DEBUG /;
+use vars qw/ @ISA $DEBUG $SHOWTRANSLATE /;
 @ISA = ();
 $DEBUG = 0;
 $SHOWTRANSLATE = 0;
