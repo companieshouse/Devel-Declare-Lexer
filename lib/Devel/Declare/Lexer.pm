@@ -4,6 +4,8 @@ use strict;
 use warnings;
 use v5;
 
+use feature 'say';
+
 our $VERSION = '0.012';
 
 use Data::Dumper;
@@ -78,8 +80,10 @@ sub import_for
             }
         );
         if($subinject{$word}) {
+            $DEBUG and say STDERR "- Using sub provided in import";
             *{$caller.'::'.$word} = $subinject{$word};
         } else {
+            $DEBUG and say STDERR "- Using default sub";
             *{$caller.'::'.$word} = sub () { 1; };
         }
     }
