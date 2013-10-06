@@ -9,7 +9,7 @@ use Devel::Declare::Lexer qw/ :lexer_test lexer_test2 /; # creates a lexer_test 
 
 use Test::More;
 
-#BEGIN { $Devel::Declare::Lexer::DEBUG = 1; }
+BEGIN { $Devel::Declare::Lexer::DEBUG = 1; }
 
 my $tests = 0;
 my $lexed;

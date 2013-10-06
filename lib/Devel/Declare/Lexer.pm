@@ -203,13 +203,14 @@ sub lexer
             next;
         }
 
-        $DEBUG and say STDERR "Offset[$offset], Remaining[", substr($linestr, $offset), "]";
+        $DEBUG and say STDERR "Offset[$offset], nest [$nest], Remaining[", substr($linestr, $offset), "]";
 
         if(substr($linestr, $offset, 1) eq ';') {
             $DEBUG and say STDERR "Got end of statement";
             push @tokens, new Devel::Declare::Lexer::Token::EndOfStatement;
             $offset += 1;
             $eoleos = 1;
+            last unless $nest;
             next;
         }
 
@@ -265,7 +266,10 @@ sub lexer
         }
 
         # FIXME Does this ever happen?
-        last if &$skipspace < 0;
+        if(&$skipspace < 0) {
+            $DEBUG and say STDERR "Got skipspace < 0";
+            last;
+        }
 
         # Check if its a opening bracket
         if(substr($linestr, $offset, 1) =~ /(\{|\[|\()/) {
@@ -397,7 +401,7 @@ sub lexer
         $stmt =~ s/\$/\\\$/g;
         $stmt =~ s/\n/\\n/g;
         chomp $stmt;
-        $stmt = substr($stmt, 0, (length $stmt) - 2); # strip the final \\n
+        $stmt = substr($stmt, 0, (length $stmt)); # strip the final \\n
     } else {
         $stmt =~ s/\n//g; # remove multiline on final statement
         chomp $stmt;
