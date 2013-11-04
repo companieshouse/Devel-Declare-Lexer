@@ -458,7 +458,7 @@ sub lexer
 
 =head1 NAME
 
-Devel::Declare::Lexer
+Devel::Declare::Lexer - Easier than Devel::Declare
 
 =head1 SYNOPSIS
 
