@@ -131,9 +131,9 @@ sub lexer
     my $line = 1;
 
     # Skip the declarator
-    $offset += Devel::Declare::toke_move_past_token($offset);
+    #$offset += Devel::Declare::toke_move_past_token($offset);
     push @tokens, new Devel::Declare::Lexer::Token::Declarator( value => $symbol );
-    $DEBUG and print STDERR "Skipped declarator '$symbol'\n";
+    #$DEBUG and print STDERR "Skipped declarator '$symbol'\n";
 
     my %lineoffsets = ( 1 => $offset );
 
@@ -443,7 +443,7 @@ sub lexer
 
     # now clear up the last line
     $DEBUG and print STDERR "Still got linestr[$linestr]\n";
-    my $sol = $line == 1 ? (length $symbol) + 1 + $original_offset : $lineoffsets{$line};
+    my $sol = $line == 1 ? (length $symbol) + 0 + $original_offset : $lineoffsets{$line};
     my $eol = (length $linestr) - 1;
     my $diff = $eol - $sol;
     my $substr = substr($linestr, $sol, $diff);
